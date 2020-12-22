@@ -1,0 +1,168 @@
+---
+title: "Exp1CorrectParticipantsDec2017"
+author: "Maria Goldshtein"
+date: "December 17, 2017"
+output: html_document
+---
+```{r setup, include=FALSE}
+
+
+library(readxl) 
+library(tidyr) 
+library(plyr) 
+library(ggplot2)
+library(visreg)
+library(dplyr) 
+library(purrr) 
+library(lme4) 
+library(sjPlot)
+library(corrr) 
+library(corrplot) 
+library(Matrix) 
+library(Rcpp) 
+library(rJava) 
+library(xlsx) 
+library(psy)
+library(psych)
+```
+
+
+Import data
+```{r}
+setwd('C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI/Qual')
+
+
+#Raw, coded target data. Make long format.
+
+wide = read_excel("2ndRecalcExp1.xlsx", sheet=3)
+keepcolumns = c("Subject","Nieuwland_Underinformative.yes.percent","ART_score","Degen_Underinformative.yes.percent","AQ_summary","Age","Sex")
+wide = wide[keepcolumns]
+long = gather(wide, key, value, -Subject, -Age, -Sex)
+write.xlsx(long, "C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI/Qual/Exp1Longnoambig.xlsx")
+
+# Raw, coded, all conditions, make long format
+setwd('C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI/Qual')
+Raw.w = read_excel("2ndRecalcExp1.xlsx", sheet=8)
+Raw.l = gather(Raw.w, key, value, -Task, -Item, -Condition)
+colnames(Raw.l) = c("Task", "Item", "Condition","Participant","Response")
+write.xlsx(Raw.l, "C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI/Qual/Exp1LongAllConditionsnoambig.xlsx")
+
+
+#Import demographic, statement and gumball data
+setwd('C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI/Qual')
+DemoData = read_excel("2ndRecalcExp1.xlsx", sheet=7) #AQ, ART, age, gender, degree
+EC = read_excel("2ndRecalcExp1.xlsx", sheet=5, col_names =T) #statement task UI responses
+   EC2 = gather(EC,key,value, -Participant) #make long format
+   EC2$Task <- rep("EC",length(EC2$Participant)) #add Task column
+IC =  read_excel("2ndRecalcExp1.xlsx", sheet=6, col_names =T) #gumball task UI responses
+   IC2 = gather(IC,key,value, -Participant) #make long format
+   IC2$Task <- rep("IC",length(IC2$Participant)) #add Task column
+ECxIC = rbind(EC2,IC2) #combine results from both tasks to one df
+ECxIC = merge(DemoData,ECxIC, by = "Participant") #add demographic, AQ and ART data to df
+        colnames(ECxIC) = c("Participant", "ART","AQ", "Gender", "Age", 
+                            "Academic Degree", "Item", 
+                            "SI.Resp", "SI.Task") #rename columns for model
+     
+```                       
+                            
+```{r}
+
+setwd('C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI')
+
+
+#Raw, coded target data. Make long format.
+
+Raw.long = read_excel("Exp1LongAllConditions212.xlsx", sheet=2)
+#subset to include only USI items
+   sttmnt.long = Raw.long[Raw.long$Condition == 'underinformative',]
+   gmbl.long = Raw.long[Raw.long$Condition == 'underinformative some',]
+UI.long = rbind(sttmnt.long, gmbl.long)
+
+
+Demo = read_excel("Exp1LongAllConditions212.xlsx", sheet=4) #demographic data
+
+Exp1Data = merge(UI.long, Demo, by="Participant")
+
+########Inferrential statistics##########
+
+Exp1Data$Response = as.factor(Exp1Data$Response)
+Exp1Data$Task = as.factor(Exp1Data$Task)
+Exp1Data$AQ = as.numeric(Exp1Data$AQ)
+
+#maximal model (it converges)
+Exp1.logReg <- glmer(Response ~ scale(AQ)*Task + 
+                    (1+Task|Participant), data=Exp1Data, family=binomial)
+#anova(ECxIC.AQ, type="III") #omnibus, should I do this? Is there another one I should do?
+
+
+#descriptive stats
+mean(Demo$AQ)
+ sd(Demo$AQ)
+mean(Demo$Age)
+ sd(Demo$Age)
+mean(Demo$ART_Total)
+ sd(Demo$ART_Total)
+
+
+#reliability
+#alpha values
+keepcol = c(2:34)
+EC=EC[keepcol]
+cronbach(EC)
+
+keepcol2=c(2:15)
+IC=IC[keepcol2]
+cronbach(IC)
+
+
+```
+
+```{r}
+setwd('C:/Users/Beefgallo/Desktop/Drive/UIUC/ASD-SI')
+
+UI.avg = read_excel("Exp1LongAllConditions212.xlsx", sheet=5)
+Averaged = merge(Demo, UI.avg, by = "Participant")
+
+
+#AQ distribution histogram
+qplot(Demo$AQ, geom="histogram", binwidth = 5,
+      main = "AQ Distribution", xlab = "AQ", fill=I("green"), 
+      col=I("blue"), alpha=I(.2), xlim=c(40,140))
+
+#histograms for distributions of participants' logical response %
+
+ggplot(Averaged, aes(x=Gmbl)) + geom_histogram(bin = 0.1)
+ggplot(Averaged, aes(x=Sttmnt)) + geom_histogram(bin = 0.1)
+       
+#proportion of logical responses in both tasks
+plot(Averaged$Sttmnt, Averaged$Gmbl, 
+      xlab= "Proportion 'logical' response on Statement task", 
+      ylab = "Proportion 'logical' response on Gumball task",frame.plot=FALSE , 
+      col=I("coral4")) #plot EC logical x IC logical
+      abline(lm(Averaged$Sttmnt ~ Averaged$Gmbl)) #fit line
+#tasksxAQ
+plot(Averaged$Gmbl, Averaged$AQ, main = "IC Avg. Logical x AQ", 
+      xlab= "Gumball logical", ylab = "AQ score",frame.plot=FALSE ,
+      col=I("violetred")) #plot IC logical x AQ
+plot(Averaged$Sttmnt, Averaged$AQ, main = "EC Avg. Logical x AQ", 
+      xlab= "Statement logical", ylab = "AQ score",frame.plot=FALSE , 
+      col=I("Indianred")) #plot EC logical x AQ
+             
+######Correlations######
+cor.test(Averaged$Sttmnt, Averaged$AQ, method = "kendall", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$AQ, method = "kendall", use = "pairwise")
+cor.test(Averaged$ART, Averaged$AQ, method = "kendall", use = "pairwise")
+cor.test(Averaged$Sttmnt, Averaged$ART, method = "kendall", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$ART, method = "kendall", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$Sttmnt, method = "kendall", use = "pairwise")
+
+
+#Pearson, just to compare
+cor.test(Averaged$Sttmnt, Averaged$AQ, method = "pearson", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$AQ, method = "pearson", use = "pairwise")
+cor.test(Averaged$ART, Averaged$AQ, method = "pearson", use = "pairwise")
+cor.test(Averaged$Sttmnt, Averaged$ART, method = "pearson", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$ART, method = "pearson", use = "pairwise")
+cor.test(Averaged$Gmbl, Averaged$Sttmnt, method = "pearson", use = "pairwise")
+
+```
