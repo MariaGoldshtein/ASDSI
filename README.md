@@ -16,3 +16,5 @@ Exp1script.Rmd - The code used to analyze experiment 1 data
 Exp2script.Rmd - The code used to analyze experiment 2 data
 
 dataforR3.xlsx - The excel file containing the data being analyzed (taken from the Exp2Data.xlsx raw data)
+
+limitations of forced-choice tasks - appendices.pdf - includes the materials used in the two experiments, with all items from all tasks, and the demographic questions asked at the end
